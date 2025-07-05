@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Refúgio Digital - Protótipo</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            color: #E5E7EB;
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            transition: background-color 1.5s ease-in-out;
+            /* Impede o zoom com duplo toque no mobile */
+            touch-action: manipulation;
+        }
+
+        .fade-in { animation: fadeIn 1s ease-in-out forwards; }
+        .fade-out { animation: fadeOut 1s ease-in-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+        .animated-gradient {
+            background: linear-gradient(270deg, #1e3a8a, #312e81, #166534, #4c1d95);
+            background-size: 800% 800%;
+            animation: breathingGradient 25s ease infinite;
+        }
+        @keyframes breathingGradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .pulse-button { animation: pulse 2.5s infinite; }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .orb-float { animation: orbFloat 6s infinite ease-in-out; }
+        @keyframes orbFloat {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
+            100% { transform: translateY(0px); }
+        }
+
+        .breathing-canvas {
+            animation: breatheCanvas 10s infinite ease-in-out;
+        }
+        @keyframes breatheCanvas {
+            0% { transform: scale(0.85); }
+            40% { transform: scale(1); }
+            100% { transform: scale(0.85); }
+        }
+        
+        .progress-bar-fill {
+            animation-name: fillProgress;
+            animation-timing-function: linear;
+            animation-fill-mode: forwards;
+        }
+        @keyframes fillProgress { from { width: 0%; } to { width: 100%; } }
+
+        .session-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            outline: none;
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+        .session-canvas:active {
+            cursor: grabbing;
+        }
+    </style>
+</head>
+<body class="w-screen h-screen overflow-hidden">
+
+    <div id="tela-onboarding" class="w-full h-full flex flex-col justify-center items-center p-8 text-center animated-gradient relative z-10">
+        <div class="fade-in">
+            <h1 class="text-4xl md:text-5xl font-light mb-4">Seu refúgio digital.</h1>
+            <p class="text-lg md:text-xl text-gray-300 mb-12">Um espaço para pausas conscientes no meio do caos.</p>
+            <button id="btn-comecar" class="bg-white/20 hover:bg-white/30 text-white font-semibold py-3 px-8 rounded-full transition-all duration-300 pulse-button">Começar</button>
+        </div>
+    </div>
+
+    <div id="tela-permissoes" class="w-full h-full flex-col justify-center items-center p-8 text-center animated-gradient relative z-10 hidden">
+        <div class="fade-in">
+            <svg class="w-16 h-16 mx-auto mb-6 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+            <h2 class="text-3xl md:text-4xl font-light mb-4">Lembretes gentis.</h2>
+            <p class="text-lg md:text-xl text-gray-300 mb-12 max-w-md mx-auto">Podemos te enviar uma notificação por dia para lembrar você de fazer uma pausa? Sem spam, prometemos.</p>
+            <div class="flex justify-center gap-4">
+                <button id="btn-sim-notificacao" class="bg-white/20 hover:bg-white/30 text-white font-semibold py-3 px-8 rounded-full transition-all duration-300">Sim, por favor</button>
+                <button id="btn-nao-notificacao" class="bg-transparent hover:bg-white/10 text-white font-semibold py-3 px-8 rounded-full transition-all duration-300">Agora não</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="tela-principal" class="w-full h-full flex-col justify-center items-center p-8 text-center relative z-10 hidden">
+        <div class="absolute top-6 right-6 z-20">
+             <svg class="w-6 h-6 text-white/30 hover:text-white/60 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+        </div>
+        <p id="texto-principal" class="text-2xl md:text-3xl font-light transition-transform duration-200">Toque e segure para iniciar sua pausa.</p>
+        <div id="hold-circle" class="absolute bg-white/20 rounded-full transition-all duration-1000" style="width: 0px; height: 0px; opacity: 0; transform: translate(-50%, -50%);"></div>
+        <div id="expand-circle" class="absolute rounded-full z-30" style="width: 0px; height: 0px; transform: translate(-50%, -50%); transition: all 0.7s cubic-bezier(0.4, 0, 0.2, 1);"></div>
+    </div>
+
+    <div id="tela-selecao" class="w-full h-full flex flex-col md:flex-row justify-center items-center p-8 gap-8 relative z-10 hidden">
+        <div class="orb-card orb-float flex flex-col justify-center items-center w-60 h-80 animated-gradient rounded-3xl p-6 text-center cursor-pointer transition-all duration-500 hover:bg-white/20 hover:scale-105" data-session="respirar" data-duration="120">
+            <h3 class="text-5xl font-light mb-2">2 min</h3>
+            <p class="text-2xl text-gray-300">Respirar</p>
+        </div>
+        <div class="orb-card orb-float flex flex-col justify-center items-center w-60 h-80 animated-gradient rounded-3xl p-6 text-center cursor-pointer transition-all duration-500 hover:bg-white/20 hover:scale-105" style="animation-delay: -2s;" data-session="clarear" data-duration="300">
+            <h3 class="text-5xl font-light mb-2">5 min</h3>
+            <p class="text-2xl text-gray-300">Clarear</p>
+        </div>
+        <div class="orb-card orb-float flex flex-col justify-center items-center w-60 h-80 animated-gradient rounded-3xl p-6 text-center cursor-pointer transition-all duration-500 hover:bg-white/20 hover:scale-105" style="animation-delay: -4s;" data-session="focar" data-duration="600">
+            <h3 class="text-5xl font-light mb-2">10 min</h3>
+            <p class="text-2xl text-gray-300">Focar</p>
+        </div>
+    </div>
+    
+    <div id="tela-sessao" class="w-full h-full flex flex-col justify-center items-center p-8 relative z-10 hidden">
+        <div id="progress-container" class="absolute top-0 left-0 w-full h-1 bg-white/10">
+            <div id="progress-bar" class="h-full bg-white/70"></div>
+        </div>
+        <div id="session-element-container" class="w-full h-full absolute top-0 left-0">
+        </div>
+        <div id="completion-message" class="hidden text-center fade-in absolute z-20">
+            <h2 class="text-4xl font-light mb-8">Pausa concluída.</h2>
+            <button id="btn-voltar" class="bg-white/20 hover:bg-white/30 text-white font-semibold py-3 px-8 rounded-full transition-all duration-300">Voltar</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Seletores de Elementos ---
+        const body = document.body;
+        const telaOnboarding = document.getElementById('tela-onboarding');
+        const telaPermissoes = document.getElementById('tela-permissoes');
+        const telaPrincipal = document.getElementById('tela-principal');
+        const telaSelecao = document.getElementById('tela-selecao');
+        const telaSessao = document.getElementById('tela-sessao');
+        const btnComecar = document.getElementById('btn-comecar');
+        const btnSimNotificacao = document.getElementById('btn-sim-notificacao');
+        const btnNaoNotificacao = document.getElementById('btn-nao-notificacao');
+        const textoPrincipal = document.getElementById('texto-principal');
+        const holdCircle = document.getElementById('hold-circle');
+        const expandCircle = document.getElementById('expand-circle');
+        const orbes = document.querySelectorAll('.orb-card');
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar');
+        const sessionContainer = document.getElementById('session-element-container');
+        const completionMessage = document.getElementById('completion-message');
+        const btnVoltar = document.getElementById('btn-voltar');
+
+        // --- Variáveis de Estado ---
+        let holdTimeout, pulseInterval, isHolding = false;
+
+        // --- Variáveis Three.js ---
+        let scene, camera, renderer, sphere, uniforms, animationFrameId, starField;
+        let isDragging = false, previousMousePosition = { x: 0, y: 0 };
+        let rhythmicTime = 0;
+
+        const THEME_LEVELS = [
+            { threshold: 0,  name: "Calma Noturna", colors: { bg: '#0a0a1a', sphereA: 0x1e3a8a, sphereB: 0x4c1d95 } },
+            { threshold: 5,  name: "Amanhecer",    colors: { bg: '#1f1b2e', sphereA: 0x7b2cbf, sphereB: 0xf472b6 } },
+            { threshold: 10, name: "Nebulosa",     colors: { bg: '#0c2424', sphereA: 0x0369a1, sphereB: 0x14b8a6 } }
+        ];
+
+        // --- Funções de Tema ---
+        function getCurrentTheme() {
+            const sessionsCompleted = parseInt(localStorage.getItem('sessionsCompleted') || '0', 10);
+            return THEME_LEVELS.slice().reverse().find(level => sessionsCompleted >= level.threshold).colors;
+        }
+
+        function applyAppTheme() {
+            const theme = getCurrentTheme();
+            body.style.backgroundColor = theme.bg;
+        }
+
+        // --- Funções de Transição ---
+        function switchScreen(from, to) {
+            from.classList.add('fade-out');
+            setTimeout(() => {
+                from.classList.add('hidden');
+                from.classList.remove('fade-out');
+                to.classList.remove('hidden');
+                to.classList.add('fade-in');
+                setTimeout(() => to.classList.remove('fade-in'), 1000);
+            }, 500);
+        }
+        
+        function returnToMainScreen() {
+            telaSessao.style.transition = 'transform 0.5s ease-in, opacity 0.5s ease-in';
+            telaSessao.style.transform = 'scale(0.8)';
+            telaSessao.style.opacity = '0';
+            setTimeout(() => {
+                telaSessao.classList.add('hidden');
+                telaSessao.style.transform = 'scale(1)';
+                telaSessao.style.opacity = '1';
+                
+                applyAppTheme();
+                
+                telaPrincipal.classList.remove('hidden');
+                telaPrincipal.classList.add('fade-in');
+                setTimeout(() => telaPrincipal.classList.remove('fade-in'), 1000);
+            }, 500);
+        }
+
+        // --- Lógica do Fluxo ---
+        btnComecar.addEventListener('click', () => switchScreen(telaOnboarding, telaPermissoes));
+
+        function goToMainScreen() {
+            applyAppTheme();
+            switchScreen(telaPermissoes, telaPrincipal);
+        }
+
+        btnSimNotificacao.addEventListener('click', () => {
+            if ('Notification' in window) Notification.requestPermission().then(goToMainScreen);
+            else goToMainScreen();
+        });
+        btnNaoNotificacao.addEventListener('click', goToMainScreen);
+        
+        telaPrincipal.addEventListener('mousedown', handlePressStart);
+        telaPrincipal.addEventListener('mouseup', handlePressEnd);
+        telaPrincipal.addEventListener('touchstart', handlePressStart, { passive: true });
+        telaPrincipal.addEventListener('touchend', handlePressEnd);
+
+        orbes.forEach(orbe => {
+            orbe.addEventListener('click', () => {
+                const sessionType = orbe.dataset.session;
+                const duration = parseInt(orbe.dataset.duration, 10);
+                orbes.forEach(o => {
+                    if (o !== orbe) {
+                        o.style.opacity = '0';
+                        o.style.transform = 'scale(0.8)';
+                    }
+                });
+                orbe.style.transform = 'translateY(-50%) scale(1.5)';
+                orbe.style.opacity = '0';
+                setTimeout(() => {
+                    telaSelecao.classList.add('hidden');
+                    telaSessao.classList.remove('hidden');
+                    startSession(sessionType, duration);
+                    orbes.forEach(o => {
+                        o.style.opacity = '1';
+                        o.style.transform = '';
+                    });
+                }, 600);
+            });
+        });
+
+        // --- Lógica da Sessão 3D ---
+        function createStarfield() {
+            const group = new THREE.Group();
+            const starVertices = [];
+            const starPositions = [];
+            const starCount = 2000;
+            for (let i = 0; i < starCount; i++) {
+                const x = THREE.MathUtils.randFloatSpread(200);
+                const y = THREE.MathUtils.randFloatSpread(200);
+                const z = THREE.MathUtils.randFloatSpread(200);
+                starVertices.push(x, y, z);
+                starPositions.push(new THREE.Vector3(x, y, z));
+            }
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+            const material = new THREE.PointsMaterial({ color: 0xffffff, size: 0.2, transparent: true, opacity: 0.8 });
+            const stars = new THREE.Points(geometry, material);
+            group.add(stars);
+            const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.1 });
+            for (let i = 0; i < 50; i++) {
+                const start = starPositions[Math.floor(Math.random() * starPositions.length)];
+                const end = starPositions[Math.floor(Math.random() * starPositions.length)];
+                if (start.distanceTo(end) < 30) {
+                    const lineGeometry = new THREE.BufferGeometry().setFromPoints([start, end]);
+                    const line = new THREE.Line(lineGeometry, lineMaterial);
+                    group.add(line);
+                }
+            }
+            return group;
+        }
+        function initThreeJS(container, colorA, colorB) {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.z = 2.5;
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            const canvas = renderer.domElement;
+            canvas.className = 'session-canvas';
+            container.appendChild(canvas);
+            uniforms = {
+                time: { value: 1.0 },
+                colorA: { value: new THREE.Color(colorA) },
+                colorB: { value: new THREE.Color(colorB) }
+            };
+            const material = new THREE.ShaderMaterial({
+                uniforms: uniforms,
+                vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+                fragmentShader: `uniform float time; uniform vec3 colorA; uniform vec3 colorB; varying vec2 vUv; void main() { vec2 uv = vUv * 2.0 - 1.0; float d = length(uv); vec3 color = mix(colorA, colorB, smoothstep(0.0, 1.2, d) + 0.5 * sin(vUv.y * 5.0 + time)); gl_FragColor = vec4(color, 1.0); }`
+            });
+            const geometry = new THREE.SphereGeometry(1.5, 64, 64);
+            sphere = new THREE.Mesh(geometry, material);
+            scene.add(sphere);
+            starField = createStarfield();
+            scene.add(starField);
+            addRotationControls(canvas);
+            function animate() {
+                animationFrameId = requestAnimationFrame(animate);
+                uniforms.time.value += 0.02;
+                if(sphere) sphere.rotation.y += 0.0005;
+                if (body.classList.contains('rhythmic-mode') && starField) {
+                    rhythmicTime += 0.01;
+                    const scale = 1.0 + 0.05 * Math.sin(rhythmicTime * Math.PI / 2);
+                    starField.scale.set(scale, scale, scale);
+                }
+                renderer.render(scene, camera);
+            }
+            animate();
+            canvas.classList.add('breathing-canvas');
+        }
+        function addRotationControls(canvas) {
+            canvas.addEventListener('mousedown', e => { isDragging = true; });
+            canvas.addEventListener('mouseup', e => { isDragging = false; });
+            canvas.addEventListener('mouseleave', e => { isDragging = false; });
+            canvas.addEventListener('mousemove', e => {
+                if (!isDragging) return;
+                const deltaX = e.movementX || e.mozMovementX || e.webkitMovementX || 0;
+                const deltaY = e.movementY || e.mozMovementY || e.webkitMovementY || 0;
+                if(sphere && sphere.visible) {
+                    sphere.rotation.y += deltaX * 0.01;
+                    sphere.rotation.x += deltaY * 0.01;
+                }
+                if(starField) {
+                    starField.rotation.y += deltaX * 0.002;
+                    starField.rotation.x += deltaY * 0.002;
+                }
+            });
+            canvas.addEventListener('touchstart', e => { isDragging = true; previousMousePosition.x = e.touches[0].clientX; previousMousePosition.y = e.touches[0].clientY; }, { passive: true });
+            canvas.addEventListener('touchend', e => { isDragging = false; });
+            canvas.addEventListener('touchmove', e => {
+                if (!isDragging) return;
+                const deltaX = e.touches[0].clientX - previousMousePosition.x;
+                const deltaY = e.touches[0].clientY - previousMousePosition.y;
+                if(sphere && sphere.visible) {
+                    sphere.rotation.y += deltaX * 0.01;
+                    sphere.rotation.x += deltaY * 0.01;
+                }
+                if(starField) {
+                    starField.rotation.y += deltaX * 0.002;
+                    starField.rotation.x += deltaY * 0.002;
+                }
+                previousMousePosition.x = e.touches[0].clientX;
+                previousMousePosition.y = e.touches[0].clientY;
+            }, { passive: true });
+        }
+
+        function startSession(type, duration) {
+            sessionContainer.innerHTML = '';
+            completionMessage.classList.add('hidden');
+            sessionContainer.classList.remove('hidden');
+            
+            const theme = getCurrentTheme();
+            rhythmicTime = 0;
+
+            if (type === 'respirar') {
+                progressContainer.classList.remove('hidden');
+                progressBar.style.animation = 'none';
+                progressBar.offsetHeight;
+                progressBar.style.animation = `fillProgress ${duration}s linear forwards`;
+
+                initThreeJS(sessionContainer, theme.sphereA, theme.sphereB);
+                body.classList.add('rhythmic-mode');
+                setTimeout(endSession, duration * 1000);
+
+            } else {
+                progressContainer.classList.add('hidden');
+                
+                const placeholder = document.createElement('div');
+                placeholder.className = "w-full h-full flex flex-col justify-center items-center text-center p-4";
+                
+                const placeholderText = document.createElement('p');
+                placeholderText.className = "text-2xl font-light";
+                placeholderText.textContent = `A sessão "${type}" está a ser preparada.`;
+                
+                const backButton = document.createElement('button');
+                backButton.className = "mt-8 bg-white/20 hover:bg-white/30 text-white font-semibold py-3 px-8 rounded-full transition-all duration-300";
+                backButton.textContent = "Voltar";
+                backButton.onclick = returnToMainScreen;
+
+                placeholder.appendChild(placeholderText);
+                placeholder.appendChild(backButton);
+                sessionContainer.appendChild(placeholder);
+            }
+        }
+
+        function cleanupThreeJS() {
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            if (sessionContainer) sessionContainer.innerHTML = '';
+            scene = null; camera = null; renderer = null; sphere = null; starField = null;
+        }
+
+        function endSession() {
+            sessionContainer.classList.add('hidden');
+            completionMessage.classList.remove('hidden');
+            body.classList.remove('rhythmic-mode');
+            cleanupThreeJS();
+            let sessionsCompleted = parseInt(localStorage.getItem('sessionsCompleted') || '0', 10);
+            sessionsCompleted++;
+            localStorage.setItem('sessionsCompleted', sessionsCompleted);
+        }
+        
+        btnVoltar.addEventListener('click', returnToMainScreen);
+
+        function handlePressStart(e) {
+            if (isHolding) return;
+            isHolding = true;
+            const x = e.clientX || e.touches[0].clientX;
+            const y = e.clientY || e.touches[0].clientY;
+            holdCircle.style.left = `${x}px`;
+            holdCircle.style.top = `${y}px`;
+            holdCircle.style.opacity = '1';
+            holdCircle.style.width = '200px';
+            holdCircle.style.height = '200px';
+            let pulseCount = 0;
+            pulseInterval = setInterval(() => {
+                textoPrincipal.style.transform = `scale(${1.02 + (pulseCount * 0.01)})`;
+                setTimeout(() => { textoPrincipal.style.transform = 'scale(1)'; }, 150);
+                pulseCount++;
+            }, 500);
+            holdTimeout = setTimeout(() => {
+                clearTimeout(holdTimeout);
+                clearInterval(pulseInterval);
+            }, 1500);
+        }
+        function handlePressEnd(e) {
+            if (!isHolding) return;
+            isHolding = false;
+            const holdDuration = holdTimeout ? (1500 - (holdTimeout.__timeLeft || 0)) : 1500;
+            clearTimeout(holdTimeout);
+            clearInterval(pulseInterval);
+            textoPrincipal.style.transform = 'scale(1)';
+            holdCircle.style.opacity = '0';
+            holdCircle.style.width = '0px';
+            holdCircle.style.height = '0px';
+            if (holdDuration >= 1450) {
+                const x = e.clientX || e.changedTouches[0].clientX;
+                const y = e.clientY || e.changedTouches[0].clientY;
+                const theme = getCurrentTheme();
+                const colorA_css = new THREE.Color(theme.sphereA).getStyle();
+                const colorB_css = new THREE.Color(theme.sphereB).getStyle();
+                expandCircle.style.background = `radial-gradient(circle, ${colorB_css} 0%, ${colorA_css} 100%)`;
+                expandCircle.style.left = `${x}px`;
+                expandCircle.style.top = `${y}px`;
+                expandCircle.style.width = `${window.innerWidth * 2.5}px`;
+                expandCircle.style.height = `${window.innerWidth * 2.5}px`;
+                setTimeout(() => {
+                    telaPrincipal.classList.add('hidden');
+                    telaSelecao.classList.remove('hidden');
+                    expandCircle.style.transition = 'none';
+                    expandCircle.style.width = '0px';
+                    expandCircle.style.height = '0px';
+                    expandCircle.style.background = '';
+                    setTimeout(() => {
+                        expandCircle.style.transition = 'all 0.7s cubic-bezier(0.4, 0, 0.2, 1)';
+                    }, 50);
+                }, 700);
+            }
+        }
+        
+        window.onload = () => {
+            applyAppTheme();
+        };
+
+    </script>
+</body>
+</html>
